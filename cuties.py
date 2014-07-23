@@ -49,9 +49,7 @@ class cuties(object):
             if has_photos:
                 self.image_urls.append(filename)
                 self.profile_urls.append(dog_id)
-                #return dog_id, self.base_image_url + filename
             else:
-                #return None
                 pass
 
     def has_photo(self, filename):
@@ -74,17 +72,12 @@ class cuties(object):
                 f.write(pooch_url + '\n')
             return self.profile_base + pooch_url, self.pooch_image
 
-    def pooch_info(self):
-        pass
-
     def resize_image(self, pooch_image):
         from PIL import Image
         im = Image.open(pooch_image)
-        #
         im = im.convert('RGBA')
         out = Image.new(size=(450, 240), color='white', mode='RGBA')
         out.paste(im, (85, 0), im)
-        #out.save('/var/www/ecal/blametommy.com/public/barf5.jpg')
         out.save(pooch_image)
 
     def compose_tweet(self):
@@ -102,8 +95,6 @@ class cuties(object):
         try:
             age = soup.find_all('span', class_='field-label')[1].next_sibling.next_sibling.text
         except:
-            # Add logging.
-            # This excludes dogs without an age listed, not fair.
             print('No age, dog profile removed? Retrying...')
             return compose_tweet()
         gender = soup.find_all('span', class_='field-label')[2].next_sibling.next_sibling.text
@@ -131,8 +122,6 @@ class cuties(object):
         else:
             age_string = 'a {} {}'.format(quantity, scale)
         gender = gender.strip('\n').strip(' ').lower()
-        # personality
-        # print soup.find(attrs={"name": "description"})
         if energy != None:
             tweet_text = 'Hi, I\'m {}, {} old {} energy {}. {}'.format(name, age_string, energy, gender, pooch_url)
         else:
