@@ -1,0 +1,6 @@
+cruft
+venv
+*.pyc
+*.swp
+dog_image_urls.txt
+tweeted_dogs.csv
