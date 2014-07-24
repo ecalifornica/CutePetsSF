@@ -4,3 +4,4 @@ venv
 *.swp
 dog_image_urls.txt
 tweeted_dogs.csv
+*.log

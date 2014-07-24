@@ -14,7 +14,6 @@ class tweet_poster(object):
 
     def post_tweet(self, text, image=None):
         self.status_count = self.api.me().statuses_count
-        print(self.status_count)
         if self.status_count % 30 == 0:
             tweet = self.api.update_status('I\'m a bot that tweets about pets available for adoption at sfspca.org You can find my source code at github.com/ecalifornica/CutiesInSF')
         elif image:

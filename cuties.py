@@ -1,23 +1,31 @@
+import logging
 import os
 import random
-import pickle
 from urlparse import urlparse
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
+from PIL import Image
 import twitter_oauth
 
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+handler = logging.FileHandler('cuties.log')
+handler.setLevel(logging.DEBUG)
+logger.addHandler(handler)
+logger.debug('Cuties start')
 
-class cuties(object):
-    def __init__(self):
-        self.dogs = None
-        self.image_base = (
-                        'https://www.sfspca.org/sites/default/files/styles/' +
-                        '480_width/public/images/animals/')
-        self.profile_base = 'https://www.sfspca.org/adoptions/pet-details/'
-        self.get_fresh_data()
-        self.make_dog_lists()
+class dog(object):
+    '''
+    Scrapes the SF SPCA adoptions pages. 
+    Returns a list of URLs.
+    '''
+    def __init__(self, refresh=True):
+        self.dog_list = self.make_dog_list(refresh)
+        self.name = 'barf'
+        self.dog_info()
 
     def scrape(self, page=0):
+        logger.debug('Making a request.')
         dog_page = requests.get('https://www.sfspca.org/adoptions/dogs?page={}'.format(page))
         soup = BeautifulSoup(dog_page.text)
         dogs = soup.findAll('div', class_='node-animal')
@@ -27,82 +35,69 @@ class cuties(object):
             urls = [dog.img['src'] for dog in dogs]
         return urls + self.scrape(page+1)
 
-    def get_fresh_data(self, refresh=False):
+    def make_dog_list(self, refresh):
+        '''
+        Calls scrape or loads a list of dog image urls.
+        Parses the list and outputs a list of dictionaries.
+        Each dictionary is dog_id: dog_image_filename.
+        '''
         if refresh:
-            self.dogs = self.scrape()
-            with open('dog_image_urls.txt', 'w') as f:
-                pickle.dump(self.dogs, f)
-        elif self.dogs is None:
-            with open('dog_image_urls.txt', 'r') as f:
-                self.dogs = pickle.load(f)
+            # Call scrape()
+            dogs = self.scrape()
         else:
-            return self.dogs
-                
-    def make_dog_lists(self):
-        self.image_urls = []
-        self.profile_urls = []
-        for url in self.dogs:
+            import pickle
+            with open('dog_image_urls.txt', 'r') as f:
+                dogs = pickle.load(f)
+        dog_list = []
+        for url in dogs:
             path = urlparse(url)[2]
             filename = path.split('/').pop()
-            has_photos, dog_id = self.has_photo(filename)
-            if has_photos:
-                self.image_urls.append(filename)
-                self.profile_urls.append(dog_id)
+            filename_components = filename.split('-')
+            # Dogs without a photo have a default image that ends in photo
+            if filename_components[1] != 'photo.jpg':
+                dog_id = filename_components[0]
+                #dog = dict(dog_id=filename)
+                dog = {dog_id: filename}
+                dog_list.append(dog)
             else:
                 pass
+        return dog_list
 
-    def has_photo(self, filename):
-        filename = filename.split('-')
-        return filename[1] != 'photo.jpg', filename[0]
-
-    def timer(self):
-        pass
-
-    def random_pooch(self):
-        pooch = random.randrange(len(self.image_urls))
-        pooch_url = self.profile_urls[pooch]
-        self.pooch_image = self.image_urls[pooch]
+    def choose_dog(self):
+        '''
+        Takes a list of dictionaries that represent dogs.
+        Returns a random dog.
+        '''
+        choice = random.randrange(len(self.dog_list))
+        lucky_dog = self.dog_list[choice]
+        self.dog_id = lucky_dog.keys()[0]
+        self.image = lucky_dog.values()[0]
         with open('tweeted_dogs.csv', 'r') as f:
             tweeted_dogs = f.read()
-        if pooch_url in tweeted_dogs:
-            return self.random_pooch()
+        if self.dog_id in tweeted_dogs:
+            logger.debug('Repeat dog, choosing another')
+            os.remove(self.image)
+            #return self.choose_dog()
         else:
             with open('tweeted_dogs.csv', 'a') as f:
-                f.write(pooch_url + '\n')
-            return self.profile_base + pooch_url, self.pooch_image
-
-    def resize_image(self, pooch_image):
-        from PIL import Image
-        im = Image.open(pooch_image)
+                f.write(self.dog_id + '\n')
+            return self.dog_id
+        
+    def dog_image(self):
+        image_file = requests.get('https://www.sfspca.org/sites/default/' +
+            'files/styles/480_width/public/images/animals/' +
+            self.image)
+        with open(self.image, 'wb') as f:
+            for chunk in image_file.iter_content(chunk_size=1024):
+                f.write(chunk)
+        im = Image.open(self.image)
         im = im.convert('RGBA')
         out = Image.new(size=(450, 240), color='white', mode='RGBA')
         out.paste(im, (85, 0), im)
-        out.save(pooch_image)
+        out.save(self.image)
+        return self.image
 
-    def compose_tweet(self):
-        pooch_url, self.pooch_image = cuties_in_sf.random_pooch()
-        pooch_page = requests.get(pooch_url)
-        image_file = requests.get(self.image_base + self.pooch_image)
-        with open(self.pooch_image, 'wb') as f:
-            for chunk in image_file.iter_content(chunk_size=1024):
-                f.write(chunk)
-
-        # Resize image.
-        self.resize_image(self.pooch_image)
-
-        soup = BeautifulSoup(pooch_page.text)
-        try:
-            age = soup.find_all('span', class_='field-label')[1].next_sibling.next_sibling.text
-        except:
-            print('No age, dog profile removed? Retrying...')
-            return self.compose_tweet()
-        gender = soup.find_all('span', class_='field-label')[2].next_sibling.next_sibling.text
-        name = soup.find('h1').text
-        try:
-            energy = soup.find_all('span', class_='field-label')[3].next_sibling.next_sibling.text
-            energy = energy.strip('\n').strip(' ').lower()
-        except:
-            energy = None
+    def age_parse(self, age):
         years = ''
         quantity = ''
         for i in age:
@@ -112,26 +107,70 @@ class cuties(object):
             elif i == 'M':
                 scale = 'month'
                 break
-            #if i in '0123456789':
-            if i.isdigit():
+            if i.isdigit:
                 quantity += i
         if quantity == '1':
             age_string = 'a {}'.format(scale)
         elif quantity in ('8', '11'):
-            age_string = 'an {} {}'.format('eight', scale)
+            age_string = 'an {} {}'.format(quantity, scale)
         else:
             age_string = 'a {} {}'.format(quantity, scale)
-        gender = gender.strip('\n').strip(' ').lower()
+        return age_string
+
+    def dog_info(self):
+        self.choose_dog()
+        self.dog_image()
+        self.profile_url = 'https://www.sfspca.org/' + 'adoptions/pet-details/' + self.dog_id
+        dog_profile = requests.get(self.profile_url)
+        profile_soup = BeautifulSoup(dog_profile.text)
+        stats = profile_soup.find_all('span', class_='field-label')
+        try:
+            self.name = profile_soup.find('h1').text
+            age = stats[1].next_sibling.next_sibling.text.strip('\n ')
+            self.age = self.age_parse(age)
+            self.gender = stats[2].next_sibling.next_sibling.text.strip('\n').strip(' ').lower()
+            #self.personality
+            try:
+                energy = stats[3].next_sibling.next_sibling.text
+                self.energy = energy.strip('\n').strip(' ').lower()
+            except:
+                self.energy = None
+        except:
+            logger.debug('No info for dog, choosing another.')
+            os.remove(self.image)
+            self.dog_info()
+
+# Public knowledge of dog:
+# Image filename, name, age, gender, energy, personality
+class tweet(object):
+    def __init__(self):
+        self.lucky_dog = dog()
+        self.text = self.from_dog()
+        self.image = self.lucky_dog.image
+
+    def from_dog(self):
+        name = self.lucky_dog.name
+        age = self.lucky_dog.age
+        gender = self.lucky_dog.gender
+        energy = self.lucky_dog.energy
+        url = self.lucky_dog.profile_url
         if energy != None:
-            tweet_text = 'Hi, I\'m {}, {} old {} energy {}. {}'.format(name, age_string, energy, gender, pooch_url)
+            if energy in ('low', 'medium', 'high'):
+                text = 'Hi! I\'m {}, {} old {} energy {}. {}'.format(name, age, energy, gender, url)
+            else:
+                text = 'Hi! I\'m {}, {} old {} {}. {}'.format(name, age, energy, gender, url)
+            return text
         else:
-            tweet_text = 'Hi, I\'m {}, {} old {}. {}'.format(name, age_string, gender, pooch_url)
-        return self.pooch_image, tweet_text
+            text = 'Hi! I\'m {}, {} old {}. {}'.format(name, age, gender, url)
+            return text
+
+    def post_to_Twitter(self):
+        twitter_api = twitter_oauth.tweet_poster()
+        tweet_id = twitter_api.post_tweet(self.text, self.image)
+        os.remove(self.image)
+        return tweet_id
 
 
-cuties_in_sf = cuties()
-tweet_image, tweet_text = cuties_in_sf.compose_tweet()
-poster = twitter_oauth.tweet_poster()
-tweet_id = poster.post_tweet(tweet_text, tweet_image)
-os.remove(tweet_image)
-print('Success! Tweet ID: {}'.format(tweet_id))
+tweet_id = tweet().post_to_Twitter()
+# 
+logger.debug('Success! Tweet ID: {}'.format(tweet_id))
