@@ -1,10 +1,10 @@
+import os
+import random
+import pickle
+from urlparse import urlparse
 from bs4 import BeautifulSoup
 import requests
-from urlparse import urlparse
-import pickle
-import random
 import twitter_oauth
-import os
 
 
 class cuties(object):
@@ -14,7 +14,6 @@ class cuties(object):
                         'https://www.sfspca.org/sites/default/files/styles/' +
                         '480_width/public/images/animals/')
         self.profile_base = 'https://www.sfspca.org/adoptions/pet-details/'
-
         self.get_fresh_data()
         self.make_dog_lists()
 
@@ -96,7 +95,7 @@ class cuties(object):
             age = soup.find_all('span', class_='field-label')[1].next_sibling.next_sibling.text
         except:
             print('No age, dog profile removed? Retrying...')
-            return compose_tweet()
+            return self.compose_tweet()
         gender = soup.find_all('span', class_='field-label')[2].next_sibling.next_sibling.text
         name = soup.find('h1').text
         try:
@@ -113,7 +112,8 @@ class cuties(object):
             elif i == 'M':
                 scale = 'month'
                 break
-            if i in '0123456789':
+            #if i in '0123456789':
+            if i.isdigit():
                 quantity += i
         if quantity == '1':
             age_string = 'a {}'.format(scale)
