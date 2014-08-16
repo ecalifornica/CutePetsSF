@@ -27,7 +27,8 @@ class dog(object):
     def scrape(self, page=0):
         logger.debug('Making a request.')
         dog_page = requests.get('https://www.sfspca.org/adoptions/dogs?page={}'.format(page))
-        soup = BeautifulSoup(dog_page.text)
+        cat_page = requests.get('https://www.sfspca.org/adoptions/cats?page={}'.format(page))
+        dog_soup = BeautifulSoup(dog_page.text)
         dogs = soup.findAll('div', class_='node-animal')
         if len(dogs) == 0:
             return []
