@@ -19,17 +19,17 @@ class dog(object):
     Scrapes the SF SPCA adoptions pages. 
     Returns a list of URLs.
     '''
-    def __init__(self, refresh=True):
+    def __init__(self, testing=False, refresh=True):
         self.dog_list = self.make_dog_list(refresh)
         self.name = 'barf'
-        self.dog_info()
+        self.dog_info(testing)
 
     def scrape(self, page=0):
         logger.debug('Making a request.')
         dog_page = requests.get('https://www.sfspca.org/adoptions/dogs?page={}'.format(page))
         cat_page = requests.get('https://www.sfspca.org/adoptions/cats?page={}'.format(page))
         dog_soup = BeautifulSoup(dog_page.text)
-        dogs = soup.findAll('div', class_='node-animal')
+        dogs = dog_soup.findAll('div', class_='node-animal')
         if len(dogs) == 0:
             return []
         else:
@@ -45,6 +45,7 @@ class dog(object):
         if refresh:
             # Call scrape()
             dogs = self.scrape()
+            logger.debug('Number of dogs currently available: {}'.format(len(dogs)))
         else:
             import pickle
             with open('dog_image_urls.txt', 'r') as f:
@@ -62,9 +63,10 @@ class dog(object):
                 dog_list.append(dog)
             else:
                 pass
+        logger.debug('Number of dogs with photos: {}'.format(len(dog_list)))
         return dog_list
 
-    def choose_dog(self):
+    def choose_dog(self, testing=False):
         '''
         Takes a list of dictionaries that represent dogs.
         Returns a random dog.
@@ -78,11 +80,13 @@ class dog(object):
         if self.dog_id in tweeted_dogs:
             logger.debug('Repeat dog, choosing another')
             os.remove(self.image)
-            #return self.choose_dog()
-        else:
+            return self.choose_dog()
+        elif not testing:
             with open('tweeted_dogs.csv', 'a') as f:
+                logger.debug('Dog ID {} added to list of tweeted dogs.'.format(self.dog_id))
                 f.write(self.dog_id + '\n')
-            return self.dog_id
+        logger.debug('New dog id: {}'.format(self.dog_id))
+        return self.dog_id
         
     def dog_image(self):
         image_file = requests.get('https://www.sfspca.org/sites/default/' +
@@ -118,8 +122,8 @@ class dog(object):
             age_string = 'a {} {}'.format(quantity, scale)
         return age_string
 
-    def dog_info(self):
-        self.choose_dog()
+    def dog_info(self, testing):
+        self.choose_dog(testing)
         self.dog_image()
         self.profile_url = 'https://www.sfspca.org/' + 'adoptions/pet-details/' + self.dog_id
         dog_profile = requests.get(self.profile_url)
@@ -144,8 +148,8 @@ class dog(object):
 # Public knowledge of dog:
 # Image filename, name, age, gender, energy, personality
 class tweet(object):
-    def __init__(self):
-        self.lucky_dog = dog()
+    def __init__(self, testing=False):
+        self.lucky_dog = dog(testing)
         self.text = self.from_dog()
         self.image = self.lucky_dog.image
 
@@ -172,6 +176,7 @@ class tweet(object):
         return tweet_id
 
 
-tweet_id = tweet().post_to_Twitter()
-# 
+#tweet_id = tweet().post_to_Twitter()
+cutepetssf_tweet = tweet()
+tweet_id = cutepetssf_tweet.post_to_Twitter()
 logger.debug('Success! Tweet ID: {}'.format(tweet_id))
