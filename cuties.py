@@ -14,9 +14,10 @@ handler.setLevel(logging.DEBUG)
 logger.addHandler(handler)
 logger.debug('Cuties start')
 
+
 class dog(object):
     '''
-    Scrapes the SF SPCA adoptions pages. 
+    Scrapes the SF SPCA adoptions pages.
     Returns a list of URLs.
     '''
     def __init__(self, testing=False, refresh=True):
@@ -26,8 +27,13 @@ class dog(object):
 
     def scrape(self, page=0):
         logger.debug('Making a request.')
-        dog_page = requests.get('https://www.sfspca.org/adoptions/dogs?page={}'.format(page))
-        cat_page = requests.get('https://www.sfspca.org/adoptions/cats?page={}'.format(page))
+        dog_page = requests.get('https://www.sfspca.org/adoptions/dogs?'
+                                'page={}'.format(page))
+        # TODO
+        '''
+        cat_page = requests.get('https://www.sfspca.org/adoptions/cats?'
+                                'page={}'.format(page))
+        '''
         dog_soup = BeautifulSoup(dog_page.text)
         dogs = dog_soup.findAll('div', class_='node-animal')
         if len(dogs) == 0:
@@ -45,7 +51,8 @@ class dog(object):
         if refresh:
             # Call scrape()
             dogs = self.scrape()
-            logger.debug('Number of dogs currently available: {}'.format(len(dogs)))
+            logger.debug('Number of dogs currently available: {}'
+                         .format(len(dogs)))
         else:
             import pickle
             with open('dog_image_urls.txt', 'r') as f:
@@ -58,7 +65,7 @@ class dog(object):
             # Dogs without a photo have a default image that ends in photo
             if filename_components[1] != 'photo.jpg':
                 dog_id = filename_components[0]
-                #dog = dict(dog_id=filename)
+                # dog = dict(dog_id=filename)
                 dog = {dog_id: filename}
                 dog_list.append(dog)
             else:
@@ -83,15 +90,17 @@ class dog(object):
             return self.choose_dog()
         elif not testing:
             with open('tweeted_dogs.csv', 'a') as f:
-                logger.debug('Dog ID {} added to list of tweeted dogs.'.format(self.dog_id))
+                logger.debug('Dog ID {} added to list of tweeted dogs.'
+                             .format(self.dog_id))
                 f.write(self.dog_id + '\n')
         logger.debug('New dog id: {}'.format(self.dog_id))
         return self.dog_id
-        
+
     def dog_image(self):
-        image_file = requests.get('https://www.sfspca.org/sites/default/' +
-            'files/styles/480_width/public/images/animals/' +
-            self.image)
+        image_path = ('https://www.sfspca.org/sites/default/files/styles/'
+                      '480_width/public/images/animals' +
+                      self.image)
+        image_file = requests.get(image_path)
         with open(self.image, 'wb') as f:
             for chunk in image_file.iter_content(chunk_size=1024):
                 f.write(chunk)
@@ -103,7 +112,7 @@ class dog(object):
         return self.image
 
     def age_parse(self, age):
-        years = ''
+        # years = ''
         quantity = ''
         for i in age:
             if i == 'Y':
@@ -125,7 +134,8 @@ class dog(object):
     def dog_info(self, testing):
         self.choose_dog(testing)
         self.dog_image()
-        self.profile_url = 'https://www.sfspca.org/' + 'adoptions/pet-details/' + self.dog_id
+        self.profile_url = ('https://www.sfspca.org/adoptions/pet-details/' +
+                            self.dog_id)
         dog_profile = requests.get(self.profile_url)
         profile_soup = BeautifulSoup(dog_profile.text)
         stats = profile_soup.find_all('span', class_='field-label')
@@ -133,8 +143,12 @@ class dog(object):
             self.name = profile_soup.find('h1').text
             age = stats[1].next_sibling.next_sibling.text.strip('\n ')
             self.age = self.age_parse(age)
-            self.gender = stats[2].next_sibling.next_sibling.text.strip('\n').strip(' ').lower()
-            #self.personality
+            self.gender = stats[2].next_sibling \
+                                  .next_sibling \
+                                  .text.strip('\n') \
+                                  .strip(' ') \
+                                  .lower()
+            # self.personality
             try:
                 energy = stats[3].next_sibling.next_sibling.text
                 self.energy = energy.strip('\n').strip(' ').lower()
@@ -144,6 +158,7 @@ class dog(object):
             logger.debug('No info for dog, choosing another.')
             os.remove(self.image)
             self.dog_info()
+
 
 # Public knowledge of dog:
 # Image filename, name, age, gender, energy, personality
@@ -159,14 +174,25 @@ class tweet(object):
         gender = self.lucky_dog.gender
         energy = self.lucky_dog.energy
         url = self.lucky_dog.profile_url
-        if energy != None:
+        if energy is not None:
             if energy in ('low', 'medium', 'high'):
-                text = 'Hi! I\'m {}, {} old {} energy {}. {}'.format(name, age, energy, gender, url)
+                text = 'Hi! I\'m {}, {} old {} energy {}. {}'.format(name,
+                                                                     age,
+                                                                     energy,
+                                                                     gender,
+                                                                     url)
             else:
-                text = 'Hi! I\'m {}, {} old {} {}. {}'.format(name, age, energy, gender, url)
+                text = 'Hi! I\'m {}, {} old {} {}. {}'.format(name,
+                                                              age,
+                                                              energy,
+                                                              gender,
+                                                              url)
             return text
         else:
-            text = 'Hi! I\'m {}, {} old {}. {}'.format(name, age, gender, url)
+            text = 'Hi! I\'m {}, {} old {}. {}'.format(name,
+                                                       age,
+                                                       gender,
+                                                       url)
             return text
 
     def post_to_Twitter(self):
