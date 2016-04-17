@@ -2,9 +2,11 @@ import logging
 import os
 import random
 from urlparse import urlparse
-import requests
+
 from bs4 import BeautifulSoup
+import requests
 from PIL import Image
+
 import twitter_oauth
 
 logging.basicConfig(level=logging.DEBUG)
@@ -15,7 +17,7 @@ logger.addHandler(handler)
 logger.debug('Cuties start')
 
 
-class dog(object):
+class Dog(object):
     '''
     Scrapes the SF SPCA adoptions pages.
     Returns a list of URLs.
