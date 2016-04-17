@@ -80,6 +80,7 @@ class Dog(object):
         Takes a list of dictionaries that represent dogs.
         Returns a random dog.
         '''
+        logger.debug('Choosing a random dog.')
         choice = random.randrange(len(self.dog_list))
         lucky_dog = self.dog_list[choice]
         self.dog_id = lucky_dog.keys()[0]
