@@ -4,17 +4,14 @@ import random
 from urlparse import urlparse
 
 from bs4 import BeautifulSoup
-import requests
+import pickle
 from PIL import Image
+import requests
 
 import twitter_oauth
 
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-handler = logging.FileHandler('cuties.log')
-handler.setLevel(logging.DEBUG)
-logger.addHandler(handler)
-logger.debug('Cuties start')
+logging.basicConfig(level=logging.DEBUG, filename='cuties.log')
+logging.debug('Cuties start')
 
 
 class Dog(object):
@@ -28,20 +25,16 @@ class Dog(object):
         self.dog_info(testing)
 
     def scrape(self, page=0):
-        logger.debug('Making a request.')
+        logging.debug('Making a request.')
         dog_page = requests.get('https://www.sfspca.org/adoptions/dogs?'
                                 'page={}'.format(page))
-        # TODO
-        '''
-        cat_page = requests.get('https://www.sfspca.org/adoptions/cats?'
-                                'page={}'.format(page))
-        '''
         dog_soup = BeautifulSoup(dog_page.text)
         dogs = dog_soup.findAll('div', class_='node-animal')
         if len(dogs) == 0:
             return []
         else:
             urls = [dog.img['src'] for dog in dogs]
+
         return urls + self.scrape(page+1)
 
     def make_dog_list(self, refresh):
@@ -51,12 +44,9 @@ class Dog(object):
         Each dictionary is dog_id: dog_image_filename.
         '''
         if refresh:
-            # Call scrape()
             dogs = self.scrape()
-            logger.debug('Number of dogs currently available: {}'
-                         .format(len(dogs)))
+            logging.debug('Currently available pups: {}'.format(len(dogs)))
         else:
-            import pickle
             with open('dog_image_urls.txt', 'r') as f:
                 dogs = pickle.load(f)
         dog_list = []
@@ -64,15 +54,15 @@ class Dog(object):
             path = urlparse(url)[2]
             filename = path.split('/').pop()
             filename_components = filename.split('-')
-            # Dogs without a photo have a default image that ends in photo
+            # TODO
             if filename_components[1] != 'photo.jpg':
                 dog_id = filename_components[0]
-                # dog = dict(dog_id=filename)
                 dog = {dog_id: filename}
                 dog_list.append(dog)
             else:
                 pass
-        logger.debug('Number of dogs with photos: {}'.format(len(dog_list)))
+        logging.debug('Number of dogs with photos: {}'.format(len(dog_list)))
+
         return dog_list
 
     def choose_dog(self, testing=False):
@@ -80,23 +70,27 @@ class Dog(object):
         Takes a list of dictionaries that represent dogs.
         Returns a random dog.
         '''
-        logger.debug('Choosing a random dog.')
+        logging.debug('Choosing a random dog.')
         choice = random.randrange(len(self.dog_list))
         lucky_dog = self.dog_list[choice]
         self.dog_id = lucky_dog.keys()[0]
         self.image = lucky_dog.values()[0]
+
         with open('tweeted_dogs.csv', 'r') as f:
             tweeted_dogs = f.read()
+
         if self.dog_id in tweeted_dogs:
-            logger.debug('Repeat dog, choosing another')
+            logging.debug('Repeat dog, choosing another')
             os.remove(self.image)
+
             return self.choose_dog()
+
         elif not testing:
             with open('tweeted_dogs.csv', 'a') as f:
-                logger.debug('Dog ID {} added to list of tweeted dogs.'
-                             .format(self.dog_id))
+                logging.debug('Dog ID {} tweet recorded'.format(self.dog_id))
                 f.write(self.dog_id + '\n')
-        logger.debug('New dog id: {}'.format(self.dog_id))
+        logging.debug('New dog id: {}'.format(self.dog_id))
+
         return self.dog_id
 
     def dog_image(self):
@@ -104,19 +98,22 @@ class Dog(object):
                       '480_width/public/images/animals' +
                       self.image)
         image_file = requests.get(image_path)
+
         with open(self.image, 'wb') as f:
             for chunk in image_file.iter_content(chunk_size=1024):
                 f.write(chunk)
+
         im = Image.open(self.image)
         im = im.convert('RGBA')
         out = Image.new(size=(450, 240), color='white', mode='RGBA')
         out.paste(im, (85, 0), im)
         out.save(self.image)
+
         return self.image
 
     def age_parse(self, age):
-        # years = ''
         quantity = ''
+
         for i in age:
             if i == 'Y':
                 scale = 'year'
@@ -126,12 +123,14 @@ class Dog(object):
                 break
             if i.isdigit:
                 quantity += i
+
         if quantity == '1':
             age_string = 'a {}'.format(scale)
         elif quantity in ('8', '11'):
             age_string = 'an {} {}'.format(quantity, scale)
         else:
             age_string = 'a {} {}'.format(quantity, scale)
+
         return age_string
 
     def dog_info(self, testing):
@@ -142,6 +141,7 @@ class Dog(object):
         dog_profile = requests.get(self.profile_url)
         profile_soup = BeautifulSoup(dog_profile.text)
         stats = profile_soup.find_all('span', class_='field-label')
+
         try:
             self.name = profile_soup.find('h1').text
             age = stats[1].next_sibling.next_sibling.text.strip('\n ')
@@ -151,6 +151,7 @@ class Dog(object):
                                   .text.strip('\n') \
                                   .strip(' ') \
                                   .lower()
+
             # self.personality
             try:
                 energy = stats[3].next_sibling.next_sibling.text
@@ -158,16 +159,17 @@ class Dog(object):
             except:
                 self.energy = None
         except:
-            logger.debug('No info for dog, choosing another.')
+            logging.debug('No info for dog, choosing another.')
             os.remove(self.image)
             self.dog_info()
 
 
-# Public knowledge of dog:
-# Image filename, name, age, gender, energy, personality
-class tweet(object):
+class Tweet(object):
+    '''
+    Image filename, name, age, gender, energy, personality
+    '''
     def __init__(self, testing=False):
-        self.lucky_dog = dog(testing)
+        self.lucky_dog = Dog(testing)
         self.text = self.from_dog()
         self.image = self.lucky_dog.image
 
@@ -199,13 +201,12 @@ class tweet(object):
             return text
 
     def post_to_Twitter(self):
-        twitter_api = twitter_oauth.tweet_poster()
+        twitter_api = twitter_oauth.TweetPoster()
         tweet_id = twitter_api.post_tweet(self.text, self.image)
         os.remove(self.image)
         return tweet_id
 
 
-#tweet_id = tweet().post_to_Twitter()
-cutepetssf_tweet = tweet()
+cutepetssf_tweet = Tweet()
 tweet_id = cutepetssf_tweet.post_to_Twitter()
-logger.debug('Success! Tweet ID: {}'.format(tweet_id))
+logging.debug('Success! Tweet ID: {}'.format(tweet_id))

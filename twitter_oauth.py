@@ -7,7 +7,8 @@ access_token = os.environ.get('CUTIESINSF_ACCESS_TOKEN')
 access_token_secret = os.environ.get('CUTIESINSF_ACCESS_TOKEN_SECRET')
 
 
-class tweet_poster(object):
+class TweetPoster(object):
+
     def __init__(self):
         auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
         auth.set_access_token(access_token, access_token_secret)
@@ -25,6 +26,7 @@ class tweet_poster(object):
             tweet = self.api.update_with_media(image, text)
         else:
             tweet = self.api.update_status(text)
+
         return tweet.id
 
     def follow_followers(self):
